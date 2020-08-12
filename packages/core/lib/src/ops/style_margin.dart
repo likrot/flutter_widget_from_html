@@ -2,88 +2,45 @@ part of '../core_widget_factory.dart';
 
 const _kCssMargin = 'margin';
 
-Iterable<Widget> _marginHorizontalBuilder(
-  BuildContext context,
-  Iterable<Widget> children,
-  _MarginHorizontalInput input,
-) {
-  final direction = Directionality.of(context);
-  final margin = input.margin;
-  final tsb = input.meta.tsb;
-  final padding = EdgeInsets.only(
-    left: margin.left(direction)?.getValue(context, tsb) ?? 0.0,
-    right: margin.right(direction)?.getValue(context, tsb) ?? 0.0,
-  );
+Widget _marginHorizontalBuilder(
+  Widget child,
+  CssLengthBox margin,
+  TextStyleBuilder tsb,
+) =>
+    Builder(builder: (context) {
+      final direction = Directionality.of(context);
 
-  return children.map((child) {
-    if (child is _MarginHorizontal) {
-      final existing = child.padding as EdgeInsets;
-      return _MarginHorizontal(
-        child.child,
-        existing.copyWith(
-          left: existing.left + padding.left,
-          right: existing.right + padding.right,
+      return Padding(
+        child: child,
+        padding: EdgeInsets.only(
+          left: margin.left(direction)?.getValue(context, tsb) ?? 0.0,
+          right: margin.right(direction)?.getValue(context, tsb) ?? 0.0,
         ),
       );
-    }
+    });
 
-    return _MarginHorizontal(child, padding);
-  }).toList();
-}
-
-class _MarginHorizontal extends Padding {
-  _MarginHorizontal(Widget child, EdgeInsets padding)
-      : super(child: child, padding: padding);
-}
-
-class _MarginHorizontalInput {
-  CssLengthBox margin;
-  NodeMetadata meta;
-  WidgetFactory wf;
-}
-
-Iterable<Widget> _marginVerticalBuilder(
-  BuildContext context,
-  Iterable<Widget> widgets,
-  _MarginVerticalInput input,
-) {
-  final widget = widgets?.isNotEmpty == true ? widgets.first : null;
-  final existingHeight = widget is SizedBox ? widget.height : 0.0;
-  final height = input.height.getValue(context, input.tsb);
-  if (height > existingHeight) return [SizedBox(height: height)];
-  return widgets;
-}
-
-class _MarginVerticalInput {
-  final TextStyleBuilders tsb;
+class _MarginVerticalPlaceholder extends WidgetPlaceholder<CssLength> {
   final CssLength height;
+  final TextStyleBuilder tsb;
 
-  _MarginVerticalInput(this.tsb, this.height);
-}
-
-class _MarginVerticalPlaceholder
-    extends WidgetPlaceholder<_MarginVerticalInput> {
-  _MarginVerticalPlaceholder(TextStyleBuilders tsb, CssLength height)
-      : assert(height != null),
-        super(
-          builder: _marginVerticalBuilder,
-          input: _MarginVerticalInput(tsb, height),
-        );
-
-  void mergeWith(_MarginVerticalPlaceholder other) {
-    final otherBuilders = other.builders.toList(growable: false);
-    final otherInputs = other.inputs.toList(growable: false);
-    for (var i = 0; i < otherBuilders.length; i++) {
-      if (otherBuilders[i] == _marginVerticalBuilder &&
-          otherInputs[i] is _MarginVerticalInput) {
-        super.wrapWith<_MarginVerticalInput>(
-            _marginVerticalBuilder, otherInputs[i]);
-      }
-    }
+  _MarginVerticalPlaceholder(this.height, this.tsb) : super(generator: height) {
+    super.wrapWith((child) => _build(child, height, tsb));
   }
 
+  void mergeWith(_MarginVerticalPlaceholder other) =>
+      super.wrapWith((child) => _build(child, other.height, other.tsb));
+
   @override
-  void wrapWith<T>(WidgetPlaceholderBuilder<T> builder, [T input]) => this;
+  _MarginVerticalPlaceholder wrapWith(Widget Function(Widget) builder) => this;
+
+  static Widget _build(Widget child, CssLength height, TextStyleBuilder tsb) =>
+      Builder(builder: (context) {
+        if (child is Builder) child = (child as Builder).builder(context);
+        final existing = child is SizedBox ? (child as SizedBox).height : 0.0;
+        final value = height.getValue(context, tsb);
+        if (value > existing) return SizedBox(height: value);
+        return child;
+      });
 }
 
 class _StyleMargin {
@@ -95,52 +52,42 @@ class _StyleMargin {
         isBlockElement: false,
         onPieces: (meta, pieces) {
           if (meta.isBlockElement) return pieces;
-          final margin = wf.parseCssMargin(meta);
-          if (margin?.hasLeftOrRight != true) return pieces;
+          final m = wf.parseCssLengthBox(meta, _kCssMargin);
+          if (m?.hasLeftOrRight != true) return pieces;
 
           return _wrapTextBits(
             pieces,
             appendBuilder: (parent) =>
-                TextWidget(parent, _paddingInlineAfter(parent.tsb, margin)),
+                TextWidget(parent, _paddingInlineAfter(parent.tsb, m)),
             prependBuilder: (parent) =>
-                TextWidget(parent, _paddingInlineBefore(parent.tsb, margin)),
+                TextWidget(parent, _paddingInlineBefore(parent.tsb, m)),
           );
         },
         onWidgets: (meta, widgets) {
           if (widgets?.isNotEmpty != true) return null;
-          final m = wf.parseCssMargin(meta);
+          final m = wf.parseCssLengthBox(meta, _kCssMargin);
           if (m == null) return null;
 
           final t = m.top?.isNotEmpty == true;
           final b = m.bottom?.isNotEmpty == true;
-          final ws = List<Widget>((t ? 1 : 0) + widgets.length + (b ? 1 : 0));
-          final tsb = meta.tsb;
+          final ws = List<WidgetPlaceholder>(
+              (t ? 1 : 0) + widgets.length + (b ? 1 : 0));
+          final tsb = meta.tsb();
 
           var i = 0;
-          if (t) ws[i++] = _MarginVerticalPlaceholder(tsb, m.top);
+          if (t) ws[i++] = _MarginVerticalPlaceholder(m.top, tsb);
 
-          if (m.hasLeftOrRight) {
-            for (final widget in widgets) {
-              final input = _MarginHorizontalInput()
-                ..margin = m
-                ..meta = meta
-                ..wf = wf;
+          for (final widget in widgets) {
+            if (m.hasLeftOrRight) {
+              widget.wrapWith(
+                (child) => _marginHorizontalBuilder(child, m, tsb),
+              );
+            }
 
-              ws[i++] = widget is WidgetPlaceholder
-                  ? (widget..wrapWith(_marginHorizontalBuilder, input))
-                  : WidgetPlaceholder(
-                      builder: _marginHorizontalBuilder,
-                      children: [widget],
-                      input: input,
-                    );
-            }
-          } else {
-            for (final widget in widgets) {
-              ws[i++] = widget;
-            }
+            ws[i++] = widget;
           }
 
-          if (b) ws[i++] = _MarginVerticalPlaceholder(tsb, m.bottom);
+          if (b) ws[i++] = _MarginVerticalPlaceholder(m.bottom, tsb);
 
           return ws;
         },

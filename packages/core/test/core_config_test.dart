@@ -68,7 +68,7 @@ void main() {
             equals('[FutureBuilder:'
                 '[Center:child='
                 '[Padding:(8,8,8,8),child='
-                '[CircularProgressIndicator:]'
+                '[CircularProgressIndicator]'
                 ']]]'));
       });
     });
@@ -170,13 +170,11 @@ void main() {
   });
 
   group('customStylesBuilder', () {
-    final CustomStylesBuilder customStylesBuilder =
-        (_) => ['font-style', 'italic'];
-    final html = '<span>Foo</span>';
+    final html = 'Hello <span class="name">World</span>!';
 
     testWidgets('renders without value', (WidgetTester tester) async {
       final e = await explain(tester, HtmlWidget(html, key: helper.hwKey));
-      expect(e, equals('[RichText:(:Foo)]'));
+      expect(e, equals('[RichText:(:Hello World!)]'));
     });
 
     testWidgets('renders with value', (WidgetTester tester) async {
@@ -184,11 +182,12 @@ void main() {
         tester,
         HtmlWidget(
           html,
-          customStylesBuilder: customStylesBuilder,
+          customStylesBuilder: (e) =>
+              e.classes.contains('name') ? {'color': 'red'} : null,
           key: helper.hwKey,
         ),
       );
-      expect(explained, equals('[RichText:(+i:Foo)]'));
+      expect(explained, equals('[RichText:(:Hello (#FFFF0000:World)(:!))]'));
     });
   });
 
@@ -210,7 +209,7 @@ void main() {
           key: helper.hwKey,
         ),
       );
-      expect(explained, equals('[Text:Bar]'));
+      expect(explained, equals('[CssBlock:child=[Text:Bar]]'));
     });
   });
 

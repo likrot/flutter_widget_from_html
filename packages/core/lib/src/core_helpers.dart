@@ -1,108 +1,46 @@
+import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:html/dom.dart' as dom;
 
+part 'widget/css_element.dart';
+
 const kShouldBuildAsync = 10000;
 
-/// A no op placeholder widget.
+/// A no op widget.
 const widget0 = SizedBox.shrink();
 
-typedef CustomStylesBuilder = Iterable<String> Function(dom.Element element);
+typedef CustomStylesBuilder = Map<String, String> Function(dom.Element element);
 
 typedef CustomWidgetBuilder = Widget Function(dom.Element element);
 
-typedef WidgetPlaceholderBuilder<T> = Iterable<Widget> Function(
-    BuildContext context, Iterable<Widget> children, T input);
+typedef _WidgetPlaceholderBuilder = Widget Function(Widget child);
 
-class WidgetPlaceholder<T1> extends StatelessWidget {
-  final _builders = <Function>[];
-  final Iterable<Widget> _firstChildren;
-  final _inputs = [];
-  final WidgetPlaceholderBuilder<T1> _lastBuilder;
-  final T1 _lastInput;
+class WidgetPlaceholder<T> extends StatelessWidget {
+  final T generator;
 
-  WidgetPlaceholder({
-    WidgetPlaceholderBuilder<T1> builder,
-    Iterable<Widget> children,
-    T1 input,
-    WidgetPlaceholderBuilder<T1> lastBuilder,
-  })  : assert((builder == null) != (lastBuilder == null),
-            'Either builder or lastBuilder must be set'),
-        _firstChildren = children,
-        _lastBuilder = lastBuilder,
-        _lastInput = (lastBuilder != null ? input : null) {
-    if (builder != null) {
-      _builders.add(builder);
-      _inputs.add(input);
-    }
-  }
+  final List<_WidgetPlaceholderBuilder> _builders = [];
+  final Widget _firstChild;
 
-  Iterable<Function> get builders => _builders.skip(0);
-
-  Iterable get inputs => _inputs.skip(0);
+  WidgetPlaceholder({Widget child, @required this.generator})
+      : assert(generator != null),
+        _firstChild = child;
 
   @override
-  Widget build(BuildContext context) {
-    var output = _firstChildren;
+  Widget build(BuildContext context) => callBuilders(_firstChild);
 
-    final l = _builders.length;
-    for (var i = 0; i < l; i++) {
-      output = _builders[i](context, output, _inputs[i]);
+  Widget callBuilders(Widget child) {
+    var built = child ?? widget0;
+
+    for (final builder in _builders) {
+      built = builder(built) ?? widget0;
     }
 
-    if (_lastBuilder != null) {
-      output = _lastBuilder(context, output, _lastInput);
-    }
-
-    output = output?.where((widget) => widget != null);
-    if (output?.isNotEmpty != true) return widget0;
-    if (output.length == 1) return output.first;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: List.unmodifiable(output),
-    );
+    return built;
   }
 
-  void wrapWith<T2>(WidgetPlaceholderBuilder<T2> builder, [T2 input]) {
+  WidgetPlaceholder<T> wrapWith(_WidgetPlaceholderBuilder builder) {
     assert(builder != null);
     _builders.add(builder);
-    _inputs.add(input);
+    return this;
   }
-
-  static Iterable<Widget> wrap<T2>(
-    Iterable<Widget> widgets,
-    WidgetPlaceholderBuilder<T2> builder, [
-    T2 input,
-  ]) {
-    final wrapped = List<Widget>(widgets.length);
-
-    var i = 0;
-    for (final widget in widgets) {
-      if (widget is WidgetPlaceholder) {
-        wrapped[i++] = widget..wrapWith(builder, input);
-      } else {
-        wrapped[i++] = WidgetPlaceholder(
-          builder: builder,
-          children: [widget],
-          input: input,
-        );
-      }
-    }
-
-    return wrapped;
-  }
-
-  static Widget wrapOne<T2>(
-    Iterable<Widget> widgets,
-    WidgetPlaceholderBuilder<T2> builder, [
-    T2 input,
-  ]) =>
-      widgets.length == 1
-          ? wrap(widgets, builder, input).first
-          : WidgetPlaceholder(
-              builder: builder,
-              children: widgets,
-              input: input,
-            );
 }
