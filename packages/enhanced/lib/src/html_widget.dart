@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart'
-    as core;
+    as core show HtmlWidget;
 
 import 'helpers.dart';
 import 'widget_factory.dart';
@@ -8,11 +8,13 @@ import 'widget_factory.dart';
 /// A widget that builds Flutter widget tree from HTML
 /// with support for IFRAME, VIDEO and many other tags.
 class HtmlWidget extends core.HtmlWidget {
-  /// The flag to control whether or not to apply workaround for
+  /// Controls whether or not to apply workaround for
   /// [issue 37](https://github.com/daohoangson/flutter_widget_from_html/issues/37)
+  ///
+  /// Default: `false`.
   final bool unsupportedWebViewWorkaroundForIssue37;
 
-  /// The flag to control whether or not IFRAME is rendered as WebView.
+  /// Controls whether or not IFRAME is rendered as [WebView].
   ///
   /// You must perform additional configuration for this to work.
   /// ### iOS
@@ -30,9 +32,13 @@ class HtmlWidget extends core.HtmlWidget {
   /// ```xml
   /// <uses-permission android:name="android.permission.INTERNET" />
   /// ```
+  ///
+  /// Default: `false`.
   final bool webView;
 
-  /// The flag to control whether or not WebView has JavaScript enabled.
+  /// Controls whether to enable JavaScript in [WebView].
+  ///
+  /// Default: `true`.
   final bool webViewJs;
 
   /// Creates a widget that builds Flutter widget tree from html.
@@ -43,7 +49,7 @@ class HtmlWidget extends core.HtmlWidget {
     bool buildAsync,
     AsyncWidgetBuilder<Widget> buildAsyncBuilder,
     bool enableCaching = true,
-    WidgetFactory Function() factoryBuilder = _singleton,
+    WidgetFactory Function() factoryBuilder,
     Key key,
     Uri baseUrl,
     CustomStylesBuilder customStylesBuilder,
@@ -60,21 +66,30 @@ class HtmlWidget extends core.HtmlWidget {
           html,
           baseUrl: baseUrl,
           buildAsync: buildAsync,
-          buildAsyncBuilder: buildAsyncBuilder,
+          buildAsyncBuilder: buildAsyncBuilder ?? _buildAsyncBuilder,
           customStylesBuilder: customStylesBuilder,
           customWidgetBuilder: customWidgetBuilder,
           enableCaching: enableCaching,
-          factoryBuilder: factoryBuilder,
+          factoryBuilder: factoryBuilder ?? _getEnhancedWf,
           hyperlinkColor: hyperlinkColor,
           onTapUrl: onTapUrl,
           textStyle: textStyle,
           key: key,
         );
 
-  static WidgetFactory _wf;
-
-  static WidgetFactory _singleton() {
-    _wf ??= WidgetFactory();
-    return _wf;
+  static WidgetFactory _enhancedWf;
+  static WidgetFactory _getEnhancedWf() {
+    _enhancedWf ??= WidgetFactory();
+    return _enhancedWf;
   }
 }
+
+Widget _buildAsyncBuilder(BuildContext _, AsyncSnapshot<Widget> snapshot) =>
+    snapshot.hasData
+        ? snapshot.data
+        : const Center(
+            child: Padding(
+              child: CircularProgressIndicator(),
+              padding: EdgeInsets.all(8),
+            ),
+          );
