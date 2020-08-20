@@ -54,8 +54,8 @@ class TagA {
         },
       );
 
-  GestureTapCallback _gestureTapCallback(NodeMetadata meta) {
-    final attrs = meta.domElement.attributes;
+  GestureTapCallback _gestureTapCallback(BuildMetadata meta) {
+    final attrs = meta.element.attributes;
     final href =
         attrs.containsKey(kAttributeAHref) ? attrs[kAttributeAHref] : null;
     return wf.gestureTapCallback(wf.urlFull(href) ?? href);
@@ -67,15 +67,11 @@ class _TagATextData extends TextBit<TextStyleHtml, InlineSpan> {
 
   final GestureTapCallback onTap;
 
-  @override
-  final TextStyleBuilder tsb;
-
   final WidgetFactory wf;
 
   _TagATextData(TextData bit, this.onTap, this.wf)
       : data = bit.compile(null),
-        tsb = bit.tsb,
-        super(bit.parent);
+        super(bit.parent, bit.tsb);
 
   @override
   InlineSpan compile(TextStyleHtml tsh) =>

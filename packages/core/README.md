@@ -19,7 +19,8 @@ See the [Demo app](https://github.com/daohoangson/flutter_widget_from_html/tree/
 ### Example
 
 ```dart
-const kHtml = '''<h1>Heading 1</h1>
+const kHtml = '''
+<h1>Heading 1</h1>
 <h2>Heading 2</h2>
 <h3>Heading 3</h3>
 <h4>Heading 4</h4>
@@ -37,18 +38,18 @@ const kHtml = '''<h1>Heading 1</h1>
 class HelloWorldCoreScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(
-          title: Text('HelloWorldCoreScreen'),
-        ),
-        body: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: HtmlWidget(
-            kHtml,
-            onTapUrl: (url) => showDialog(
-              context: context,
-              builder: (_) => AlertDialog(
-                title: Text('onTapUrl'),
-                content: Text(url),
+        appBar: AppBar(title: Text('HelloWorldCoreScreen')),
+        body: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: HtmlWidget(
+              kHtml,
+              onTapUrl: (url) => showDialog(
+                context: context,
+                builder: (_) => AlertDialog(
+                  title: Text('onTapUrl'),
+                  content: Text(url),
+                ),
               ),
             ),
           ),
@@ -179,25 +180,34 @@ class CustomWidgetBuilderScreen extends StatelessWidget {
         appBar: AppBar(
           title: Text('CustomStylesBuilderScreen'),
         ),
-        body: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: HtmlWidget(
-            kHtml,
-            customWidgetBuilder: (e) {
-              if (!e.classes.contains('carousel')) return null;
+        body: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: HtmlWidget(
+              kHtml,
+              customWidgetBuilder: (e) {
+                if (!e.classes.contains('carousel')) return null;
 
-              final srcs = <String>[];
-              for (final child in e.children) {
-                for (final grandChild in child.children) {
-                  srcs.add(grandChild.attributes['src']);
+                final srcs = <String>[];
+                for (final child in e.children) {
+                  for (final grandChild in child.children) {
+                    srcs.add(grandChild.attributes['src']);
+                  }
                 }
-              }
 
-              return CarouselSlider(
-                options: CarouselOptions(),
-                items: srcs.map(_toItem).toList(growable: false),
-              );
-            },
+                return CarouselSlider(
+                  options: CarouselOptions(
+                    autoPlay: true,
+                    autoPlayAnimationDuration:
+                        const Duration(milliseconds: 250),
+                    autoPlayInterval: const Duration(milliseconds: 1000),
+                    enlargeCenterPage: true,
+                    enlargeStrategy: CenterPageEnlargeStrategy.scale,
+                  ),
+                  items: srcs.map(_toItem).toList(growable: false),
+                );
+              },
+            ),
           ),
         ),
       );
@@ -214,20 +224,20 @@ class CustomWidgetBuilderScreen extends StatelessWidget {
 
 ### Custom `WidgetFactory`
 
-The HTML string is parsed into DOM elements and each element is visited once to populate a `NodeMetadata` and collect `BuiltPiece`s. See step by step how it works:
+The HTML string is parsed into DOM elements and each element is visited once to populate a `BuildMetadata` and collect `BuiltPiece`s. See step by step how it works:
 
 | Step | | Integration point |
 | --- | --- | --- |
-| 1 | Parse the tag and attributes map | `WidgetFactory.parseTag(NodeMetadata)` |
-| 2 | Inform parents if any | `BuildOp.onChild(NodeMetadata)` |
-| 3 | Populate default inline styles | `BuildOp.defaultStyles(NodeMetadata)` |
+| 1 | Parse the tag and attributes map | `WidgetFactory.parseTag(BuildMetadata)` |
+| 2 | Inform parents if any | `BuildOp.onChild(BuildMetadata)` |
+| 3 | Populate default inline styles | `BuildOp.defaultStyles(BuildMetadata)` |
 | 4 | `customStyleBuilder` / `customWidgetBuilder` will be called if configured | |
-| 5 | Parse inline style key+value pairs, `parseStyle` may be called multiple times | `WidgetFactory.parseStyle(NodeMetadata, String, String)` |
+| 5 | Parse inline style key+value pairs, `parseStyle` may be called multiple times | `WidgetFactory.parseStyle(BuildMetadata, String, String)` |
 | 6 | Repeat with children elements to collect `BuiltPiece`s | |
-| 7 | Inform build ops | `BuildOp.onPieces(NodeMetadata, Iterable<BuiltPiece>)` |
+| 7 | Inform build ops | `BuildOp.onPieces(BuildMetadata, Iterable<BuiltPiece>)` |
 | 8 | a. If not a block element, go to 10 | |
 |   | b. Build widgets from pieces | |
-| 9 | Inform build ops | `BuildOp.onWidgets(NodeMetadata, Iterable<Widget>)` |
+| 9 | Inform build ops | `BuildOp.onWidgets(BuildMetadata, Iterable<Widget>)` |
 | 10 | The end | |
 
 Notes:
@@ -298,15 +308,15 @@ class SmilieScreen extends StatelessWidget {
 class _SmiliesWidgetFactory extends WidgetFactory {
   final smilieOp = BuildOp(
     onPieces: (meta, pieces) {
-      final alt = meta.domElement.attributes['alt'];
+      final alt = meta.element.attributes['alt'];
       final text = kSmilies.containsKey(alt) ? kSmilies[alt] : alt;
       return pieces..first?.text?.addText(text);
     },
   );
 
   @override
-  void parse(NodeMetadata meta) {
-    final e = meta.domElement;
+  void parse(BuildMetadata meta) {
+    final e = meta.element;
     if (e.localName == 'img' &&
         e.classes.contains('smilie') &&
         e.attributes.containsKey('alt')) {
